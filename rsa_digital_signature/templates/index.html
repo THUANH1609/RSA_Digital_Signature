@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ký & Truyền File RSA</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        body {
+            background-color: #f8f9fa; /* Nền màu xám nhạt */
+            font-family: 'Inter', sans-serif; /* Sử dụng font Inter */
+        }
+        .container {
+            max-width: 900px; /* Container rộng hơn một chút */
+        }
+        .card {
+            border-radius: 0.75rem;
+            box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.1);
+            margin-bottom: 1.5rem; /* Thêm khoảng trống giữa các card */
+        }
+        .card-header {
+            border-top-left-radius: 0.75rem;
+            border-top-right-radius: 0.75rem;
+            font-weight: bold;
+        }
+        .alert-info-custom {
+            background-color: #d1ecf1;
+            border-color: #bee5eb;
+            color: #0c5460;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 0.25rem;
+        }
+        .alert-info-custom ul {
+            list-style: none;
+            padding: 0;
+            margin-top: 10px;
+        }
+        .alert-info-custom li {
+            margin-bottom: 5px;
+        }
+        .alert-info-custom li a {
+            font-weight: bold;
+            color: #007bff;
+            text-decoration: none; /* Bỏ gạch chân */
+        }
+        .alert-info-custom .lead {
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        .icon {
+            margin-right: 5px;
+        }
+        .nav-link.active {
+            font-weight: bold;
+            color: #0d6efd !important; /* Màu chính của Bootstrap */
+            border-bottom: 2px solid #0d6efd;
+        }
+        .file-drop-area {
+            border: 2px dashed #007bff;
+            border-radius: 0.5rem;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        .file-drop-area:hover {
+            background-color: #e9f5ff;
+        }
+        .file-drop-area input[type="file"] {
+            display: none;
+        }
+        .status-message {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+        }
+        .status-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status-info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+    </style>
+</head>
+<body>
+<div class="container mt-5">
+    <h2 class="mb-4 text-center">🔐 Ứng dụng ký, xác minh và truyền file với RSA</h2>
+
+    <ul class="nav nav-tabs mb-4" id="myTab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="sign-verify-tab" data-bs-toggle="tab" data-bs-target="#sign-verify" type="button" role="tab" aria-controls="sign-verify" aria-selected="true">Ký & Xác minh</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="send-file-tab" data-bs-toggle="tab" data-bs-target="#send-file" type="button" role="tab" aria-controls="send-file" aria-selected="false">Gửi File</button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="myTabContent">
+        <div class="tab-pane fade show active" id="sign-verify" role="tabpanel" aria-labelledby="sign-verify-tab">
+            <div class="card">
+                <div class="card-header bg-primary text-white">Tạo khóa & Ký file</div>
+                <div class="card-body">
+                    <form method="post" action="/sign" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label for="file" class="form-label">Chọn file để ký:</label>
+                            <input type="file" class="form-control" name="file" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Ký file</button>
+                    </form>
+
+                    {% if key_created %}
+                        <div class="mt-4 alert alert-success rounded-3">
+                            ✅ Đã tạo khóa và ký file thành công!
+                            <p>🔑 Mã băm SHA-256 của file: <code>{{ hash_code }}</code></p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header bg-success text-white">Xác minh chữ ký</div>
+                <div class="card-body">
+                    <p>Xác minh chữ ký</p>
+                    
+                    {% if original_filename and signature_filename and public_key_filename %}
+                        <div class="alert-info-custom rounded-3">
+                            <p class="lead"><span class="icon">⬇️</span> Tải về file vừa ký:</p>
+                            <ul>
+                                <li><a href="{{ url_for('download_file', filename=original_filename) }}"><span class="icon">📄</span> File gốc: {{ original_filename }}</a></li>
+                                <li><a href="{{ url_for('download_file', filename=signature_filename) }}"><span class="icon">📝</span> Chữ ký (.sig): {{ signature_filename }}</a></li>
+                                <li><a href="{{ url_for('download_file', filename=public_key_filename) }}"><span class="icon">🔑</span> Public Key (.pem): {{ public_key_filename }}</a></li>
+                            </ul>
+                        </div>
+                    {% endif %}
+
+                    <form method="post" action="/verify" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label for="verify_file_input" class="form-label">File gốc:</label>
+                            <input type="file" class="form-control" name="verify_file" id="verify_file_input" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="verify_sig_input" class="form-label">Chữ ký:</label>
+                            <input type="file" class="form-control" name="verify_sig" id="verify_sig_input" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="verify_pub_input" class="form-label">Public Key (Tùy chọn):</label>
+                            <input type="file" class="form-control" name="verify_pub" id="verify_pub_input">
+                        </div>
+                        <button type="submit" class="btn btn-success"><span class="icon">✅</span> Xác minh chữ ký</button>
+                    </form>
+
+                    {% if verify_result %}
+                        <div class="mt-3 alert alert-{{ 'success' if verify_result == 'Hợp lệ' else 'danger' }} rounded-3">
+                            <span class="icon">✅</span> Kết quả xác minh: <strong>{{ verify_result }}</strong>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="send-file" role="tabpanel" aria-labelledby="send-file-tab">
+            <div class="card">
+                <div class="card-header bg-info text-white">Gửi File</div>
+                <div class="card-body">
+                    <form id="send-file-form" method="post" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label for="recipient_ip" class="form-label">Nhập địa chỉ IP người nhận:</label>
+                            <input type="text" class="form-control" id="recipient_ip" name="recipient_ip" placeholder="" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="file_to_send" class="form-label">Chọn file để gửi:</label>
+                            <input type="file" class="form-control" name="file_to_send" id="file_to_send" required>
+                        </div>
+                        <button type="submit" class="btn btn-info text-white"><span class="icon">⬆️</span> Gửi File</button>
+                    </form>
+                    <div id="send-status" class="status-message d-none"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Xử lý việc gửi form Gửi File
+        const sendFileForm = document.getElementById('send-file-form');
+        const sendStatusDiv = document.getElementById('send-status');
+
+        sendFileForm.addEventListener('submit', async function(event) {
+            event.preventDefault(); // Ngăn chặn gửi form mặc định
+
+            sendStatusDiv.classList.remove('d-none', 'status-success', 'status-error', 'status-info');
+            sendStatusDiv.classList.add('status-info');
+            sendStatusDiv.innerHTML = 'Đang kết nối và gửi file...';
+
+            const formData = new FormData(sendFileForm);
+            const recipientIp = formData.get('recipient_ip');
+            const fileToSend = formData.get('file_to_send');
+
+            // Lấy thông tin file đã ký gần nhất từ session (nếu có)
+            const originalFilename = "{{ session.get('original_filename', '') }}";
+            const signatureFilename = "{{ session.get('signature_filename', '') }}";
+            const publicKeyFilename = "{{ session.get('public_key_filename', '') }}";
+
+            if (!originalFilename || !signatureFilename || !publicKeyFilename) {
+                sendStatusDiv.classList.remove('status-info');
+                sendStatusDiv.classList.add('status-error');
+                sendStatusDiv.innerHTML = 'Lỗi: Vui lòng ký một file trước khi gửi để có chữ ký và Public Key.';
+                return;
+            }
+
+            // Tạo đối tượng FormData mới cho yêu cầu gửi thực tế
+            const sendData = new FormData();
+            sendData.append('recipient_ip', recipientIp);
+            sendData.append('file_to_send', fileToSend);
+            sendData.append('original_filename_signed', originalFilename);
+            sendData.append('signature_filename_signed', signatureFilename);
+            sendData.append('public_key_filename_signed', publicKeyFilename);
+
+            try {
+                // Gửi yêu cầu đến endpoint /send_to_ip của backend Flask
+                const response = await fetch('/send_to_ip', {
+                    method: 'POST',
+                    body: sendData
+                });
+
+                const result = await response.json();
+
+                sendStatusDiv.classList.remove('status-info');
+                if (response.ok) {
+                    sendStatusDiv.classList.add('status-success');
+                    sendStatusDiv.innerHTML = `Gửi file thành công! Phản hồi từ người nhận: ${result.message}`;
+                } else {
+                    sendStatusDiv.classList.add('status-error');
+                    sendStatusDiv.innerHTML = `Lỗi gửi file: ${result.message || 'Không rõ lỗi'}`;
+                }
+            } catch (error) {
+                sendStatusDiv.classList.remove('status-info');
+                sendStatusDiv.classList.add('status-error');
+                sendStatusDiv.innerHTML = `Lỗi kết nối hoặc mạng: ${error.message}`;
+                console.error('Lỗi khi gửi file:', error);
+            }
+        });
+
+        // Khởi tạo tab Bootstrap
+        var triggerTabList = [].slice.call(document.querySelectorAll('#myTab button'))
+        triggerTabList.forEach(function (triggerEl) {
+            var tabTrigger = new bootstrap.Tab(triggerEl)
+
+            triggerEl.addEventListener('click', function (event) {
+                event.preventDefault()
+                tabTrigger.show()
+            })
+        })
+    });
+</script>
+</body>
+</html>
